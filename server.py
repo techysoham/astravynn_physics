@@ -250,19 +250,15 @@ class H(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-    srv = None
-    for port in range(8000, 8010):
-        try:
-            srv = ThreadingHTTPServer(("127.0.0.1", port), H); break
-        except OSError:
-            print("port", port, "busy, trying next")
-    if srv is None:
-        sys.exit("No free port in 8000-8009")
-    url = "http://localhost:%d" % port
-    print("ASTRAVYNN serving on", url, "(OFFLINE: cache only)" if OFFLINE else "")
-    if "--no-browser" not in sys.argv:
-        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
+
+    port = int(os.environ.get("PORT", 8000))
+    srv = ThreadingHTTPServer(("0.0.0.0", port), H)
+
+    print(f"ASTRAVYNN serving on port {port}")
+
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        srv.server_close()
