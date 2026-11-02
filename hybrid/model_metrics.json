@@ -1,0 +1,43 @@
+{
+  "n_samples": 8000,
+  "positive_rate": 0.03125,
+  "pc_limit": 0.0001,
+  "features": [
+    "miss",
+    "rv",
+    "mR",
+    "mT",
+    "mN",
+    "agep",
+    "ages",
+    "alt",
+    "cosang"
+  ],
+  "table": [
+    {
+      "algorithm": "XGBoost-equivalent (sklearn HistGradientBoosting; install xgboost to switch)",
+      "accuracy": 0.987,
+      "recall_high_risk": 0.8,
+      "f1": 0.792,
+      "roc_auc": 0.996,
+      "fit_s": 0.6
+    },
+    {
+      "algorithm": "Logistic Regression",
+      "accuracy": 0.912,
+      "recall_high_risk": 1.0,
+      "f1": 0.417,
+      "roc_auc": 0.99,
+      "fit_s": 0.02
+    },
+    {
+      "algorithm": "Random Forest",
+      "accuracy": 0.983,
+      "recall_high_risk": 0.78,
+      "f1": 0.736,
+      "roc_auc": 0.995,
+      "fit_s": 1.56
+    }
+  ],
+  "note": "Labels come from the physics Pc on SYNTHETIC encounters with ASSUMED covariance; not validated on real CDMs."
+}

@@ -1,0 +1,5 @@
+numpy
+scipy
+scikit-learn
+# optional, used automatically if present:
+xgboost

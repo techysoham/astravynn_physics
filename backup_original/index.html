@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Orbit Watch: live orbital intelligence</title>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#070a18;--panel:rgba(10,14,30,.88);--line:#1a1e2e;--tx:#dfe7f2;--mu:#7d8aa0;--ac:#5ec8ff;--amber:#ffc857;--red:#ff5d5d;--org:#ff7a59}
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:var(--bg);color:var(--tx);font:14px/1.45 "Instrument Sans",system-ui,sans-serif;overflow:hidden}
+canvas{display:block;position:fixed;inset:0}
+.panel{position:fixed;background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:12px;backdrop-filter:blur(8px);overflow:auto;z-index:3}
+.mu{color:var(--mu)}.sm{font-size:12px}h3{font-size:12px;margin:12px 0 5px;color:var(--mu);font-weight:600}
+button,select,input[type=search]{background:#0b1022;color:var(--tx);border:1px solid var(--line);border-radius:6px;padding:6px 9px;font:inherit;cursor:pointer}
+input[type=search],select{width:100%}button:hover,select:hover{border-color:#34445f}button.on{border-color:var(--ac);color:var(--ac)}
+:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.row{display:flex;align-items:center;gap:8px;margin:4px 0;cursor:pointer}.dot{width:9px;height:9px;border-radius:50%}
+.kv{display:flex;justify-content:space-between;gap:10px;border-bottom:1px solid var(--line);padding:4px 0}.kv span{color:var(--mu)}
+.hd{display:flex;justify-content:space-between;align-items:center;gap:8px}.hd h2{margin:0;font-size:17px}
+.lnk{color:var(--ac);cursor:pointer;margin-left:8px;font-weight:400}
+#top{position:fixed;top:0;left:0;right:0;height:52px;display:flex;align-items:center;gap:14px;padding:0 14px;background:var(--panel);border-bottom:1px solid var(--line);z-index:6}
+#brand{font-weight:600;font-size:16px;white-space:nowrap}#brand small{display:block;font-size:11px;color:var(--mu);font-weight:400;line-height:1}
+#nav{display:flex;gap:4px;flex:1;overflow-x:auto}#nav button{border:0;background:none;color:var(--mu)}#nav button.on{color:var(--tx);box-shadow:inset 0 -2px var(--ac);border-radius:0}
+#clock{font-variant-numeric:tabular-nums;color:var(--mu);white-space:nowrap}
+#legend{left:12px;top:64px;width:230px;max-height:calc(100% - 140px)}
+#obj{right:12px;top:64px;width:290px;max-height:calc(100% - 330px)}
+#ev{right:12px;bottom:12px;width:290px}
+#wx{position:fixed;left:50%;bottom:12px;transform:translateX(-50%);display:flex;gap:8px;z-index:3;font-size:13px;flex-wrap:wrap;justify-content:center;max-width:46%}
+#wx span{background:var(--panel);border:1px solid var(--line);border-radius:20px;padding:4px 12px;white-space:nowrap}
+#zoom{position:fixed;left:12px;bottom:12px;display:flex;gap:6px;z-index:3}
+#view{position:fixed;inset:52px 0 0 0;background:rgba(7,10,24,.97);overflow:auto;padding:22px;z-index:5}
+#vc{max-width:1100px;margin:0 auto}#vc h1{margin:0 0 4px;font-size:22px}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px;margin:14px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:10px 14px}.card b{display:block;font-size:22px;font-weight:600}.card span{color:var(--mu);font-size:12px}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px}
+.item{padding:7px 0;border-bottom:1px solid var(--line);cursor:pointer}.item:hover{background:#0b1022}
+table{width:100%;border-collapse:collapse;font-size:13px}th{text-align:left;color:var(--mu);font-weight:500}td,th{padding:6px 8px;border-bottom:1px solid var(--line)}
+.sev-c{color:var(--red)}.sev-h{color:var(--org)}.sev-e{color:var(--amber)}.sev-m,.sev-l{color:var(--mu)}
+#load{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9;text-align:center}
+.bar{width:240px;height:4px;background:var(--line);border-radius:4px;margin:12px auto 0;overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--ac)}
+@media(max-width:820px){#ev,#wx{display:none}#obj{top:auto;bottom:12px;max-height:45%;width:auto;left:12px}#legend{width:190px}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style></head><body>
+<div id="load"><div><b style="font-size:20px">Orbit Watch</b><div class="mu" style="margin-top:6px" id="lt">Syncing live orbital data…</div><div class="bar"><i id="lb"></i></div></div></div>
+
+<header id="top"><div id="brand">Orbit Watch<small>Making orbit understandable</small></div>
+<nav id="nav"><button data-v="globe" class="on">Live globe</button><button data-v="eye">Orbital Eye</button><button data-v="man">Maneuver tracker</button><button data-v="conj">Conjunctions</button><button data-v="wl">Watchlist</button><button data-v="set">Settings</button></nav>
+<div id="clock">--</div></header>
+
+<div class="panel" id="legend"><div class="hd" id="lgh" style="cursor:pointer"><b>Legend</b><span class="mu" id="lgt">hide</span></div>
+<div id="lgb"><input type="search" id="q" placeholder="Search name or NORAD id" style="margin-top:8px">
+<h3>Tracks</h3><label class="row"><input type="checkbox" id="tr"> Show selected orbit path</label>
+<h3>Orbits <span class="lnk" data-o="all">All</span><span class="lnk" data-o="none">None</span><span class="lnk" data-o="def">Default</span></h3><div id="regs"></div>
+<h3>Constellations</h3><div id="cats"></div>
+<h3>Time</h3><select id="speed"><option value="1">Real time</option><option value="60">60× faster</option><option value="600">600× faster</option></select>
+<button id="now" style="margin-top:6px;width:100%">Reset to now</button></div></div>
+
+<aside class="panel" id="obj" hidden><div class="hd"><h2 id="sname"></h2><span><button id="star" title="Add to watchlist">☆</button> <button id="cls" title="Close">✕</button></span></div>
+<div class="mu" id="sub"></div><div id="info"></div>
+<div style="display:flex;gap:6px;margin-top:8px"><button id="focus" style="flex:1">Focus</button><button id="trackbtn" style="flex:1">Orbit path</button></div>
+<button id="predbtn" style="width:100%;margin-top:6px">Predict close approaches, next 6 h</button>
+<div id="pred" class="sm"></div><button id="pexp" hidden style="width:100%;margin-top:6px">Export for Pc pipeline</button></aside>
+
+<div class="panel" id="ev"><div class="hd"><b>Orbital events</b><span id="wins"><button data-w="1">1h</button> <button data-w="6">6h</button> <button data-w="24" class="on">24h</button> <button data-w="48">48h</button></span></div>
+<div id="evc" style="margin-top:6px"></div><div class="mu sm" id="live" style="margin-top:6px"></div></div>
+
+<div id="wx"><span id="status">Loading…</span><span id="kp"></span><span id="act"></span></div>
+<div id="zoom"><button id="zi">+</button><button id="zo">−</button><button id="rv">Reset view</button></div>
+<section id="view" hidden><div id="vc"></div></section>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js"></script>
+<script>
+const $=id=>document.getElementById(id);
+const CATS={starlink:['Starlink','#5ec8ff'],oneweb:['OneWeb','#b79bff'],gps:['GPS','#7be3a8'],debris:['Debris','#ff7a59'],other:['Other active','#cdd6e4']};
+const REGS=['LEO','MEO','GEO','HEO'],DEFAULT_ON=1;
+const catOn={starlink:1,oneweb:1,gps:1,debris:1,other:1},regOn={LEO:1,MEO:1,GEO:1,HEO:1};
+const STRAT=[[53323,'COSMOS 2558','Inspector'],[51511,'COSMOS 2553','Inspector'],[55131,'SJ-23','Inspector'],[49330,'SJ-21','Inspector'],[41838,'SHIJIAN-17','Inspector'],[25544,'ISS (ZARYA)','Infrastructure'],[48274,'TIANGONG','Infrastructure'],[20580,'HUBBLE','Science']];
+const FALLBACK=[{n:"ISS (ZARYA)",a:"1 25544U 98067A   24001.50000000  .00016717  00000-0  10270-3 0  9990",b:"2 25544  51.6400 247.4627 0006703 130.5360 325.0288 15.50000000 10000",g:"active"}];
+let cfg={units:'km',time:'UTC'},wl=new Set();
+try{Object.assign(cfg,JSON.parse(localStorage.getItem('ow_cfg')||'{}'));wl=new Set(JSON.parse(localStorage.getItem('ow_wl')||'[]'))}catch(e){}
+const save=()=>{try{localStorage.setItem('ow_cfg',JSON.stringify(cfg));localStorage.setItem('ow_wl',JSON.stringify([...wl]))}catch(e){}};
+const dist=k=>cfg.units==='mi'?(k*0.621371).toFixed(0)+' mi':k.toFixed(0)+' km';
+const dd=k=>cfg.units==='mi'?(k*0.621371).toFixed(1)+' mi':k.toFixed(1)+' km';
+let S=[],pos,col,siz,geom,points,sel=-1,simMs=Date.now(),speed=1,query='',showTrack=false,pairs=[],pairTotal=0,winH=24,decay=0,ny=0,curView='globe';
+let ok,E,Vl,vis,META={},byId=new Map(),thr=25,samec=true,mf={type:'',win:24};
+
+// ---------- scene ----------
+const renderer=new THREE.WebGLRenderer({antialias:true});renderer.setPixelRatio(Math.min(devicePixelRatio,2));renderer.setSize(innerWidth,innerHeight);document.body.prepend(renderer.domElement);
+const scene=new THREE.Scene(),camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,.1,1000);camera.position.set(0,8,24);
+const controls=new THREE.OrbitControls(camera,renderer.domElement);controls.enablePan=false;controls.minDistance=8;controls.maxDistance=120;controls.enableDamping=true;
+const earth=new THREE.Mesh(new THREE.SphereGeometry(6.371,64,64),new THREE.MeshBasicMaterial({color:0x31496b}));scene.add(earth);
+new THREE.TextureLoader().load('https://unpkg.com/three-globe/example/img/earth-blue-marble.jpg',t=>{earth.material.map=t;earth.material.color.set(0x9aa8bd);earth.material.needsUpdate=true});
+const trackLine=new THREE.Line(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0xffffff,transparent:true,opacity:.7}));scene.add(trackLine);
+const pairLines=new THREE.LineSegments(new THREE.BufferGeometry(),new THREE.LineBasicMaterial({color:0xffc857}));scene.add(pairLines);
+
+// ---------- data ----------
+function classify(s){const n=s.n.toUpperCase();if(s.g!=='active'||/ DEB|DEBRIS| R\/B/.test(n))return'debris';if(n.startsWith('STARLINK'))return'starlink';if(n.startsWith('ONEWEB'))return'oneweb';if(n.includes('NAVSTAR')||n.startsWith('GPS'))return'gps';return'other'}
+const sma=r=>Math.cbrt(398600.4418/((r.no/60)**2));
+const ap=(r,sg)=>sma(r)*(1+sg*r.ecco)-6371;
+function regime(r){const a=sma(r);if(r.ecco>.25)return'HEO';if(Math.abs(a-42164)<600)return'GEO';return a-6371<2000?'LEO':a<42000?'MEO':'HEO'}
+function epoch(r){const y=r.epochyr<57?2000+r.epochyr:1900+r.epochyr;return Date.UTC(y,0,1)+(r.epochdays-1)*864e5}
+async function load(){
+  let list,note='';
+  try{const r=await fetch('/api/catalog');const j=await r.json();META=j;list=j.sats;note=`${list.length.toLocaleString()} objects · fetched ${new Date(j.fetched*1000).toLocaleTimeString()}`}
+  catch(e){list=FALLBACK;note='Offline sample. Run server.py to load CelesTrak.'}
+  if(!list.length){list=FALLBACK;note='Catalog empty. Check server.py output.'}
+  const yy=String(new Date().getUTCFullYear()%100).padStart(2,'0');
+  for(let k=0;k<list.length;k++){const s=list[k],rec=satellite.twoline2satrec(s.a,s.b);
+    if(!rec.error){const o={n:s.n,a:s.a,b:s.b,id:s.a.slice(2,7).trim(),rec,cat:classify(s),reg:regime(rec),ep:epoch(rec),rp:ap(rec,-1),ra:ap(rec,1)};S.push(o);if(o.rp<250)decay++;if(s.a.slice(9,11)===yy)ny++}
+    if(k%1500===0){$('lb').style.width=(k/list.length*100)+'%';await new Promise(r=>setTimeout(r))}}
+  const N=S.length;byId=new Map(S.map((s,i)=>[s.id,i]));
+  pos=new Float32Array(N*3);col=new Float32Array(N*3);siz=new Float32Array(N);ok=new Uint8Array(N);E=new Float64Array(N*3);Vl=new Float64Array(N*3);vis=new Uint8Array(N);
+  S.forEach((s,i)=>new THREE.Color(CATS[s.cat][1]).toArray(col,i*3));
+  geom=new THREE.BufferGeometry();geom.setAttribute('position',new THREE.BufferAttribute(pos,3));geom.setAttribute('color',new THREE.BufferAttribute(col,3));geom.setAttribute('size',new THREE.BufferAttribute(siz,1));
+  points=new THREE.Points(geom,new THREE.ShaderMaterial({uniforms:{pr:{value:renderer.getPixelRatio()}},transparent:true,
+    vertexShader:'attribute float size;attribute vec3 color;varying vec3 c;uniform float pr;void main(){c=color;gl_PointSize=size*pr;gl_Position=projectionMatrix*modelViewMatrix*vec4(position,1.);}',
+    fragmentShader:'varying vec3 c;void main(){vec2 p=gl_PointCoord-.5;if(dot(p,p)>.25)discard;gl_FragColor=vec4(c,1.);}'}));
+  points.frustumCulled=false;scene.add(points);
+  $('status').textContent=note;const kp=META.kp==null?null:+META.kp;
+  $('kp').textContent=kp==null?'Space weather: n/a':`Space weather: Kp ${kp.toFixed(1)} · ${kp>=5?'Storm':kp>=4?'Active':'Quiet'}`;
+  $('load').style.display='none';step();screen();
+}
+
+// ---------- propagation / filters ----------
+function step(){
+  const d=new Date(simMs);
+  for(let i=0;i<S.length;i++){let pv;try{pv=satellite.propagate(S[i].rec,d)}catch(e){pv={}}
+    const p=pv.position,v=pv.velocity;
+    if(p&&isFinite(p.x)&&v){ok[i]=1;E[3*i]=p.x;E[3*i+1]=p.y;E[3*i+2]=p.z;Vl[3*i]=v.x;Vl[3*i+1]=v.y;Vl[3*i+2]=v.z;pos[3*i]=p.x/1000;pos[3*i+1]=p.z/1000;pos[3*i+2]=-p.y/1000}else ok[i]=0}
+  geom.attributes.position.needsUpdate=true;applyFilters();info();
+}
+function applyFilters(){
+  let n=0,deb=0;
+  for(let i=0;i<S.length;i++){const s=S[i],m=!query||s.n.toLowerCase().includes(query)||s.id===query;
+    const v=ok[i]&&catOn[s.cat]&&regOn[s.reg]&&m;vis[i]=v?1:0;siz[i]=!v?0:i===sel?10:wl.has(s.id)?5:2.4;if(v){n++;if(s.cat==='debris')deb++}}
+  geom.attributes.size.needsUpdate=true;updateEv(n,deb);
+}
+function updateEv(n,deb){
+  const ev=META.maneuvers||[],m=ev.filter(e=>e.t>Date.now()-winH*36e5).length;
+  const rows=[[`Maneuvers (${winH} h)`,ev.length?m:'-'],['Close pairs now',pairTotal],['Decaying orbits (perigee < 250 km)',decay],['Debris shown',deb],['Launched this year',ny]];
+  $('evc').innerHTML=rows.map(r=>`<div class="kv"><span>${r[0]}</span><b>${r[1]}</b></div>`).join('');
+  $('live').textContent=`Live tracking: ${n.toLocaleString()} of ${S.length.toLocaleString()} objects shown`;
+}
+
+// ---------- proximity right now (spatial hash) ----------
+function screen(){
+  const cell=thr,M=new Map(),K=(x,y,z)=>((x+10000)*20000+(y+10000))*20000+(z+10000),idx=[];
+  for(let i=0;i<S.length;i++)if(vis[i])idx.push(i);
+  for(const i of idx){const k=K(Math.floor(E[3*i]/cell),Math.floor(E[3*i+1]/cell),Math.floor(E[3*i+2]/cell));(M.get(k)||M.set(k,[]).get(k)).push(i)}
+  const out=[];
+  for(const i of idx){const cx=Math.floor(E[3*i]/cell),cy=Math.floor(E[3*i+1]/cell),cz=Math.floor(E[3*i+2]/cell);
+    for(let dx=-1;dx<=1;dx++)for(let dy=-1;dy<=1;dy++)for(let dz=-1;dz<=1;dz++){const b=M.get(K(cx+dx,cy+dy,cz+dz));if(!b)continue;
+      for(const j of b){if(j<=i)continue;const d=Math.hypot(E[3*i]-E[3*j],E[3*i+1]-E[3*j+1],E[3*i+2]-E[3*j+2]);if(d>thr)continue;
+        if(samec&&S[i].cat===S[j].cat&&(S[i].cat==='starlink'||S[i].cat==='oneweb'))continue;
+        out.push({i,j,d,rv:Math.hypot(Vl[3*i]-Vl[3*j],Vl[3*i+1]-Vl[3*j+1],Vl[3*i+2]-Vl[3*j+2])})}}}
+  out.sort((a,b)=>a.d-b.d);pairTotal=out.length;pairs=out.slice(0,15);
+  const a=new Float32Array(pairs.length*6);pairs.forEach((p,k)=>a.set([pos[3*p.i],pos[3*p.i+1],pos[3*p.i+2],pos[3*p.j],pos[3*p.j+1],pos[3*p.j+2]],k*6));
+  pairLines.geometry.setAttribute('position',new THREE.BufferAttribute(a,3));
+  const kp=META.kp==null?0:+META.kp,close=out.filter(p=>p.d<5).length,lv=kp>=5||close>=10?'High':kp>=4||close>=3?'Elevated':'Calm';
+  $('act').textContent='Activity: '+lv;applyFilters();if(curView==='conj')render();
+}
+
+// ---------- selection / info / track ----------
+function select(i){sel=i;$('obj').hidden=i<0;$('pred').innerHTML='';$('pexp').hidden=true;if(i>=0){$('star').textContent=wl.has(S[i].id)?'★':'☆'}applyFilters();info();drawTrack()}
+function info(){
+  if(sel<0||!S[sel])return;const s=S[sel],r=s.rec;$('sname').textContent=s.n;$('sub').textContent=CATS[s.cat][0]+' · NORAD '+s.id;
+  if(!ok[sel]){$('info').innerHTML='<div class="kv"><span>Status</span><span>Propagation failed (stale TLE)</span></div>';return}
+  const alt=Math.hypot(E[3*sel],E[3*sel+1],E[3*sel+2])-6371,v=Math.hypot(Vl[3*sel],Vl[3*sel+1],Vl[3*sel+2]);
+  const rows=[['Altitude',dist(alt)],['Speed',v.toFixed(2)+' km/s'],['Regime',s.reg],['Inclination',(r.inclo*180/Math.PI).toFixed(2)+'°'],['Period',(2*Math.PI/r.no).toFixed(1)+' min'],['Eccentricity',r.ecco.toFixed(5)],['TLE age',((simMs-s.ep)/864e5).toFixed(1)+' days']];
+  $('info').innerHTML=rows.map(x=>`<div class="kv"><span>${x[0]}</span><span>${x[1]}</span></div>`).join('');
+}
+function drawTrack(){
+  if(sel<0||!showTrack){trackLine.visible=false;return}
+  const r=S[sel].rec,per=Math.min(2*Math.PI/r.no,1440),n=180,a=new Float32Array(n*3);let c=0;
+  for(let k=0;k<n;k++){const pv=satellite.propagate(r,new Date(simMs+k/(n-1)*per*60000));if(pv.position&&isFinite(pv.position.x)){a[3*c]=pv.position.x/1000;a[3*c+1]=pv.position.z/1000;a[3*c+2]=-pv.position.y/1000;c++}}
+  trackLine.geometry.setAttribute('position',new THREE.BufferAttribute(a.slice(0,c*3),3));trackLine.geometry.computeBoundingSphere();trackLine.material.color.set(CATS[S[sel].cat][1]);trackLine.visible=true;
+}
+function setTrack(v){showTrack=v;$('tr').checked=v;$('trackbtn').classList.toggle('on',v);drawTrack()}
+
+// ---------- legend UI ----------
+$('cats').innerHTML=Object.entries(CATS).map(([k,v])=>`<label class="row"><input type="checkbox" data-c="${k}"><span class="dot" style="background:${v[1]}"></span>${v[0]}</label>`).join('');
+$('regs').innerHTML=REGS.map(r=>`<label class="row"><input type="checkbox" data-r="${r}">${r}</label>`).join('');
+function sync(){document.querySelectorAll('[data-c]').forEach(e=>e.checked=!!catOn[e.dataset.c]);document.querySelectorAll('[data-r]').forEach(e=>e.checked=!!regOn[e.dataset.r])}
+function setAll(v){for(const k in catOn)catOn[k]=v;for(const k in regOn)regOn[k]=v;sync();if(S.length){applyFilters();screen()}}
+sync();
+$('legend').addEventListener('click',e=>{const o=e.target.dataset.o;if(o)setAll(o==='none'?0:1)});
+$('lgh').onclick=()=>{const h=$('lgb').hidden=!$('lgb').hidden;$('lgt').textContent=h?'show':'hide'};
+document.addEventListener('change',e=>{const t=e.target;
+  if(t.dataset.c){catOn[t.dataset.c]=t.checked?1:0}if(t.dataset.r){regOn[t.dataset.r]=t.checked?1:0}
+  if(t.dataset.c||t.dataset.r){if(S.length){applyFilters();screen()}}
+  if(t.id==='tr')setTrack(t.checked);
+  if(t.id==='thr'){thr=+t.value;if(S.length)screen()}if(t.id==='samec'){samec=t.checked;if(S.length)screen()}
+  if(t.dataset.f==='type'){mf.type=t.value;render()}if(t.dataset.f==='win'){mf.win=+t.value;render()}});
+$('speed').onchange=e=>speed=+e.target.value;
+$('now').onclick=()=>{simMs=Date.now();$('speed').value=1;speed=1;if(S.length){step();screen();drawTrack()}};
+$('wins').onclick=e=>{const w=e.target.dataset.w;if(!w)return;winH=+w;document.querySelectorAll('#wins button').forEach(b=>b.classList.toggle('on',b===e.target));if(S.length)applyFilters()};
+$('q').addEventListener('keydown',e=>{if(e.key!=='Enter'||!S.length)return;query=e.target.value.trim().toLowerCase();applyFilters();const m=S.findIndex((s,i)=>vis[i]&&query&&(s.n.toLowerCase().includes(query)||s.id===query));if(m>=0)select(m)});
+$('q').addEventListener('input',e=>{if(!e.target.value){query='';if(S.length)applyFilters()}});
+$('cls').onclick=()=>select(-1);
+$('star').onclick=()=>{if(sel<0)return;const id=S[sel].id;wl.has(id)?wl.delete(id):wl.add(id);save();$('star').textContent=wl.has(id)?'★':'☆';applyFilters()};
+$('trackbtn').onclick=()=>setTrack(!showTrack);
+$('focus').onclick=()=>{if(sel<0||!ok[sel])return;const v=new THREE.Vector3(pos[3*sel],pos[3*sel+1],pos[3*sel+2]).normalize().multiplyScalar(15);camera.position.copy(v)};
+$('zi').onclick=()=>camera.position.multiplyScalar(.8);$('zo').onclick=()=>camera.position.multiplyScalar(1.25);$('rv').onclick=()=>camera.position.set(0,8,24);
+
+// ---------- pick ----------
+let down=null;
+renderer.domElement.addEventListener('pointerdown',e=>down=[e.clientX,e.clientY]);
+renderer.domElement.addEventListener('pointerup',e=>{
+  if(!down||Math.hypot(e.clientX-down[0],e.clientY-down[1])>4||!S.length)return;
+  const v=new THREE.Vector3(),cp=camera.position;let best=-1,bd=100;
+  for(let i=0;i<S.length;i++){if(!vis[i])continue;v.set(pos[3*i],pos[3*i+1],pos[3*i+2]);
+    const dx=v.x-cp.x,dy=v.y-cp.y,dz=v.z-cp.z,L2=dx*dx+dy*dy+dz*dz,t=Math.max(0,Math.min(1,-(cp.x*dx+cp.y*dy+cp.z*dz)/L2));
+    if(Math.hypot(cp.x+dx*t,cp.y+dy*t,cp.z+dz*t)<6.3)continue;
+    v.project(camera);const sx=(v.x+1)/2*innerWidth,sy=(1-v.y)/2*innerHeight,d=(sx-e.clientX)**2+(sy-e.clientY)**2;if(d<bd){bd=d;best=i}}
+  if(best>=0)select(best)});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight)});
+
+// ---------- pages ----------
+const card=(l,v)=>`<div class="card"><b>${v}</b><span>${l}</span></div>`;
+const ago=t=>{const h=Math.max(0,(Date.now()-t)/36e5);return h<1?Math.round(h*60)+' m ago':h<48?Math.round(h)+' h ago':Math.round(h/24)+' d ago'};
+const sevc=s=>'sev-'+s[0].toLowerCase();
+const sevOf=d=>d<1?['Critical','c']:d<5?['High','h']:d<10?['Elevated','e']:['Moderate','m'];
+function go(v){curView=v;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$('view').hidden=v==='globe';if(v!=='globe')render()}
+function render(){const f={eye,man:mans,conj:conjs,wl:wlist,set:sets}[curView];$('vc').innerHTML=f&&(S.length||curView==='set')?f():'<p class="mu">Catalog not loaded yet.</p>'}
+$('nav').onclick=e=>{if(e.target.dataset.v)go(e.target.dataset.v)};
+$('vc').onclick=e=>{const t=e.target.closest('[data-i],[data-id],[data-rm],[data-cfg],[data-exp]');if(!t)return;
+  if(t.dataset.rm){wl.delete(t.dataset.rm);save();render();applyFilters();return}
+  if(t.dataset.cfg){const[k,v]=t.dataset.cfg.split(':');cfg[k]=v;save();render();return}
+  if(t.dataset.exp){exportPairs();return}
+  const i=t.dataset.i!==undefined?+t.dataset.i:byId.get(t.dataset.id);if(i!==undefined){go('globe');select(i)}};
+function eye(){
+  const ev=META.maneuvers||[],now=Date.now(),cnt=f=>S.filter(f).length,kp=META.kp==null?'-':(+META.kp).toFixed(1);
+  const pool=S.filter(s=>s.cat==='other'&&s.reg==='LEO'),sd=pool.length?S.indexOf(pool[Math.floor(now/864e5)%pool.length]):-1;
+  return `<h1>Orbital Eye</h1><div class="mu">Situational awareness on one screen. Data: CelesTrak public elements, NOAA SWPC.</div><div class="grid">`+
+   card('Objects loaded',S.length.toLocaleString())+card('Active payloads',cnt(s=>s.cat!=='debris').toLocaleString())+card('Starlink',cnt(s=>s.cat==='starlink').toLocaleString())+card('Debris loaded',cnt(s=>s.cat==='debris').toLocaleString())+
+   card('Kp index',kp)+card('Maneuvers, 24 h',ev.length?ev.filter(e=>e.t>now-864e5).length:'-')+card('Decaying orbits',decay)+card('Close pairs now',pairTotal)+`</div>
+  <div class="two"><div><h3>Closest pairs right now</h3>${pairs.slice(0,6).map(p=>`<div class="item" data-i="${p.i}"><b class="sev-e">${dd(p.d)}</b> at ${p.rv.toFixed(1)} km/s<br><span class="mu sm">${S[p.i].n} × ${S[p.j].n}</span></div>`).join('')||'<div class="mu">None inside the threshold.</div>'}</div>
+  <div><h3>Latest maneuvers</h3>${ev.slice(-6).reverse().map(e=>`<div class="item" data-id="${e.id}"><b class="${sevc(e.sev)}">${e.type}</b> · ${ago(e.t)}<br><span class="mu sm">${e.name}</span></div>`).join('')||'<div class="mu sm">No history yet. Keep server.py running for about 2 hours.</div>'}</div>
+  <div><h3>Satellite of the day</h3>${sd>=0?`<div class="item" data-i="${sd}"><b>${S[sd].n}</b><br><span class="mu sm">NORAD ${S[sd].id} · ${S[sd].reg} · perigee ${dist(S[sd].rp)}</span></div>`:'<div class="mu">-</div>'}</div></div>`;
+}
+function mans(){
+  const ev=(META.maneuvers||[]).slice().reverse(),now=Date.now(),sid=new Set([...STRAT.map(x=>String(x[0])),...wl]);
+  const f=ev.filter(e=>e.t>now-mf.win*36e5&&(!mf.type||e.type===mf.type));
+  const types=[...new Set(ev.map(e=>e.type))];
+  return `<h1>Maneuver tracker</h1><div class="mu">Candidate burns found by comparing each new element set with the previous snapshot. Small burns and drag effects can be missed or misread.</div><div class="grid">`+
+   card('Detected, 24 h',ev.filter(e=>e.t>now-864e5).length)+card('High or Critical, 24 h',ev.filter(e=>e.t>now-864e5&&e.sev!=='Low').length)+card('Watchlist, 48 h',ev.filter(e=>e.t>now-1728e5&&sid.has(e.id)).length)+card('Objects monitored',S.length.toLocaleString())+`</div>
+  <div style="display:flex;gap:8px;max-width:420px;margin-bottom:10px"><select data-f="type"><option value="">All types</option>${types.map(t=>`<option ${t===mf.type?'selected':''}>${t}</option>`).join('')}</select><select data-f="win">${[24,48,168,720].map(w=>`<option value="${w}" ${w===mf.win?'selected':''}>Last ${w<48?w+' h':w/24+' days'}</option>`).join('')}</select></div>
+  <table><tr><th>Time</th><th>Event</th><th>Object</th><th>Change</th><th>Est. ΔV</th><th>Orbit</th><th>Severity</th></tr>${f.slice(0,100).map(e=>{const i=byId.get(e.id);return `<tr class="item" data-id="${e.id}"><td>${ago(e.t)}</td><td>${e.type}</td><td>${e.name}</td><td>${e.da>=0?'+':''}${e.da.toFixed(1)} km, Δi ${e.di.toFixed(3)}°</td><td>${e.dv.toFixed(1)} m/s</td><td>${i!==undefined?S[i].reg:'-'}</td><td class="${sevc(e.sev)}">${e.sev}</td></tr>`}).join('')||'<tr><td colspan="7" class="mu">No events yet. Detection needs two catalog refreshes (about 2 hours of server.py running).</td></tr>'}</table>
+  <h3 style="margin-top:20px">Strategic watch</h3><div class="grid">${STRAT.map(([id,n,k])=>{const i=byId.get(String(id));return i===undefined?'':`<div class="card item" ${'data-i="'+i+'"'}><b style="font-size:15px">${n}</b><span>${k} · ${S[i].reg} · ${ev.filter(e=>e.id===String(id)).length} events logged</span></div>`}).join('')}</div>`;
+}
+function conjs(){
+  const pr=predRes.length&&predPrimary>=0?`<h3 style="margin-top:20px">Predicted close approaches for ${S[predPrimary].n} (next 6 h)</h3><table><tr><th>TCA (UTC)</th><th>Secondary</th><th>Miss</th><th>Rel. speed</th><th>Severity</th></tr>${predRes.map(r=>{const sv=sevOf(r.miss);return `<tr class="item" data-i="${r.j}"><td>${new Date(r.tca).toISOString().slice(5,19).replace('T',' ')}</td><td>${S[r.j].n}</td><td>${r.miss<1?(r.miss*1000).toFixed(0)+' m':dd(r.miss)}</td><td>${r.rv.toFixed(2)} km/s</td><td class="sev-${sv[1]}">${sv[0]}</td></tr>`}).join('')}</table>`:'<p class="mu" style="margin-top:20px">To predict approaches with a time of closest approach, open an object on the globe and click "Predict close approaches".</p>';
+  return `<h1>Conjunctions</h1><div class="mu">Part 1 is distance right now, not a predicted approach. Part 2 shows predicted closest approaches from your last prediction run.</div>
+  <h3>Proximity right now (threshold ${thr} km)</h3><input type="range" id="thr" min="5" max="100" value="${thr}" style="width:260px"> <label class="row" style="display:inline-flex;margin-left:12px"><input type="checkbox" id="samec" ${samec?'checked':''}> Hide same-constellation pairs</label>
+  <table><tr><th>Distance</th><th>Rel. speed</th><th>Primary</th><th>Secondary</th></tr>${pairs.map(p=>`<tr class="item" data-i="${p.i}"><td class="sev-e">${dd(p.d)}</td><td>${p.rv.toFixed(1)} km/s</td><td>${S[p.i].n}</td><td>${S[p.j].n}</td></tr>`).join('')||'<tr><td colspan="4" class="mu">None inside the threshold.</td></tr>'}</table>
+  <button data-exp="1" style="margin-top:8px">Export pairs as JSON</button>${pr}`;
+}
+function wlist(){
+  const ev=META.maneuvers||[],row=(id,n)=>{const i=byId.get(String(id));return i===undefined?'':`<div class="item" data-i="${i}"><b>${S[i].n}</b> <span class="mu sm">NORAD ${id} · ${S[i].reg} · ${ev.filter(e=>e.id===String(id)).length} events logged</span>${n?`<button data-rm="${id}" style="float:right">Remove</button>`:''}</div>`};
+  return `<h1>Watchlist</h1><div class="mu">Star an object on the globe to add it. Saved in this browser.</div><h3>Yours</h3>${[...wl].map(id=>row(id,1)).join('')||'<div class="mu sm">Nothing starred yet.</div>'}<h3 style="margin-top:20px">Strategic watch</h3>${STRAT.map(x=>row(x[0],0)).join('')}`;
+}
+function sets(){const b=(k,v,l)=>`<button data-cfg="${k}:${v}" class="${cfg[k]===v?'on':''}">${l}</button>`;
+  return `<h1>Settings</h1><h3>Distance units</h3>${b('units','km','Kilometres')} ${b('units','mi','Miles')}<h3>Time format</h3>${b('time','UTC','UTC')} ${b('time','Local','Local')}<p class="mu sm" style="margin-top:20px">Saved in this browser.</p>`}
+function exportPairs(){const data={simulated_time:new Date(simMs).toISOString(),threshold_km:thr,note:'Snapshot distances, not TCA',pairs:pairs.map(p=>({primary:{name:S[p.i].n,norad:S[p.i].id,tle:[S[p.i].a,S[p.i].b]},secondary:{name:S[p.j].n,norad:S[p.j].id,tle:[S[p.j].a,S[p.j].b]},distance_km:+p.d.toFixed(3),relative_speed_kms:+p.rv.toFixed(3)}))};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='close_pairs.json';a.click()}
+
+// ---------- predicted close approaches (worker) ----------
+const WK=`importScripts('https://cdn.jsdelivr.net/npm/satellite.js@5.0.0/dist/satellite.min.js');
+const LIM=60,KEEP=25;
+function st(rec,t){try{const pv=satellite.propagate(rec,new Date(t));return pv.position&&pv.velocity&&isFinite(pv.position.x)?pv:null}catch(e){return null}}
+const P3=(p)=>[p.x,p.y,p.z];
+onmessage=function(ev){
+ const d=ev.data,step=d.step,n=Math.floor(d.hours*3600/step),sp=satellite.twoline2satrec(d.p[0],d.p[1]),tEnd=d.t0+d.hours*3600000;
+ const PA=[];for(let k=0;k<=n;k++)PA.push(st(sp,d.t0+k*step*1000));
+ const res=[];
+ for(let j=0;j<d.c.length;j++){
+  const rec=satellite.twoline2satrec(d.c[j][0],d.c[j][1]),found=[];
+  for(let k=0;k<=n;k++){
+   const a=PA[k];if(!a)continue;const t=d.t0+k*step*1000,b=st(rec,t);if(!b)continue;
+   const rx=b.position.x-a.position.x,ry=b.position.y-a.position.y,rz=b.position.z-a.position.z;
+   const vx=b.velocity.x-a.velocity.x,vy=b.velocity.y-a.velocity.y,vz=b.velocity.z-a.velocity.z;
+   const v2=vx*vx+vy*vy+vz*vz;if(v2<1e-12)continue;
+   const rv=rx*vx+ry*vy+rz*vz,tau=-rv/v2;
+   if(tau<-step*0.5||tau>step*1.5)continue;
+   if(rx*rx+ry*ry+rz*rz-rv*rv/v2>LIM*LIM)continue;
+   found.push(t+tau*1000);
+  }
+  let last=-1e18;
+  for(const tg of found){
+   if(tg-last<120000)continue;last=tg;
+   let lo=tg-step*1000,hi=tg+step*1000;
+   const f=t=>{const A=st(sp,t),B=st(rec,t);return A&&B?Math.hypot(B.position.x-A.position.x,B.position.y-A.position.y,B.position.z-A.position.z):1e9};
+   for(let it=0;it<30;it++){const m1=lo+(hi-lo)/3,m2=hi-(hi-lo)/3;if(f(m1)<f(m2))hi=m2;else lo=m1}
+   const tc=(lo+hi)/2;if(tc<d.t0||tc>tEnd)continue;
+   const A=st(sp,tc),B=st(rec,tc);if(!A||!B)continue;
+   const miss=Math.hypot(B.position.x-A.position.x,B.position.y-A.position.y,B.position.z-A.position.z);if(miss>KEEP)continue;
+   res.push({j:j,tca:tc,miss:miss,rv:Math.hypot(B.velocity.x-A.velocity.x,B.velocity.y-A.velocity.y,B.velocity.z-A.velocity.z),rp:P3(A.position),vp:P3(A.velocity),rs:P3(B.position),vs:P3(B.velocity)});
+  }
+  if(j%100===0)postMessage({progress:j/d.c.length});
+ }
+ postMessage({res:res});
+};`;
+let wk=null,predRes=[],predPrimary=-1;
+$('predbtn').onclick=()=>{
+  if(sel<0)return;const P=S[sel],c=[];
+  S.forEach((s,j)=>{if(j!==sel&&c.length<6000&&s.ra+30>=P.rp&&s.rp-30<=P.ra)c.push(j)});
+  if(wk)wk.terminate();wk=new Worker(URL.createObjectURL(new Blob([WK],{type:'text/javascript'})));
+  $('pred').textContent=`Screening ${c.length.toLocaleString()} objects in this altitude band…`;$('predbtn').disabled=true;$('pexp').hidden=true;predPrimary=sel;
+  wk.onmessage=e=>{const d=e.data;if(d.progress!==undefined){$('pred').textContent=`Screening… ${Math.round(d.progress*100)}%`;return}
+    $('predbtn').disabled=false;predRes=d.res.map(r=>({...r,j:c[r.j]})).sort((a,b)=>a.miss-b.miss).slice(0,25);renderPred()};
+  wk.onerror=e=>{$('predbtn').disabled=false;$('pred').textContent='Worker failed: '+(e.message||'could not load satellite.js')};
+  wk.postMessage({p:[P.a,P.b],c:c.map(j=>[S[j].a,S[j].b]),t0:simMs,hours:6,step:30});
+};
+function renderPred(){
+  $('pexp').hidden=!predRes.length;
+  $('pred').innerHTML=predRes.length?'<div class="mu" style="margin-top:6px">Next 6 h, misses under 25 km. SGP4 on public TLEs, no covariance.</div>'+predRes.map(r=>{const sv=sevOf(r.miss);
+    return `<div class="item"><b class="sev-${sv[1]}">${r.miss<1?(r.miss*1000).toFixed(0)+' m':r.miss.toFixed(2)+' km'} ${sv[0]}</b><br>${S[r.j].n}<br><span class="mu">TCA ${new Date(r.tca).toISOString().slice(5,16).replace('T',' ')} UTC · ${r.rv.toFixed(2)} km/s</span></div>`}).join(''):'<div class="mu" style="margin-top:6px">No approaches under 25 km in the next 6 hours.</div>';
+}
+$('pexp').onclick=()=>{const P=S[predPrimary];
+  const data={generated:new Date().toISOString(),window_hours:6,frame:'TEME (ECI), km and km/s',note:'SGP4 from public TLEs. No covariance: assume one before computing Pc.',primary:{name:P.n,norad:P.id,tle:[P.a,P.b]},
+   events:predRes.map(r=>({secondary:{name:S[r.j].n,norad:S[r.j].id,tle:[S[r.j].a,S[r.j].b]},tca_utc:new Date(r.tca).toISOString(),miss_km:+r.miss.toFixed(4),relative_speed_kms:+r.rv.toFixed(4),primary_state:{r:r.rp,v:r.vp},secondary_state:{r:r.rs,v:r.vs}}))};
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(data,null,2)],{type:'application/json'}));a.download='predicted_conjunctions.json';a.click()};
+
+// ---------- loop ----------
+let last=performance.now(),acc=0,acc2=0;
+function frame(t){
+  const dt=t-last;last=t;simMs+=dt*speed;acc+=dt;acc2+=dt;
+  earth.rotation.y=satellite.gstime(new Date(simMs));
+  const d=new Date(simMs);$('clock').textContent=cfg.time==='UTC'?d.toISOString().replace('T',' ').slice(0,19)+' UTC':d.toLocaleString();
+  if(S.length){if(acc>(speed>1?300:1000)){acc=0;step()}if(acc2>5000){acc2=0;screen()}}
+  controls.update();renderer.render(scene,camera);requestAnimationFrame(frame);
+}
+if(innerWidth<820){$('lgb').hidden=true;$('lgt').textContent='show'}
+requestAnimationFrame(frame);load();
+</script></body></html>
