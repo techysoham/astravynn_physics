@@ -43,10 +43,3 @@ Requires Python 3.8+ only (no pip packages). Use Chrome or Edge.
 5. **Maneuver what-if**: take the primary's SGP4 state at burn time, add Δv in a chosen direction, integrate two-body motion with and without the burn (RK4), add the difference to the SGP4 track, and recompute the minimum separation near TCA. Δv = 0 reproduces the screening result exactly. Labelled simulated; no optimization.
 6. **Validation**: `node tests/test_core.js` checks the screening against brute force (TCA within 4 ms, same miss), RTN consistency, and burn-model behaviour. The live-separation readout at TCA is a built-in cross-check.
 **Honest limits:** TLE accuracy is km-level and degrades with age; point objects; no covariance; catalog is CelesTrak groups, not the full space catalog.
-
-## 5. Hybrid ML-Physics layer (added to match the project synopsis)
-`pip install -r requirements.txt` then `python server.py`. New tab **Hybrid ML-Physics**: pick an event from Conjunction Assessment, press *Run hybrid assessment*.
-- Stage 1 `hybrid/ml.py`: gradient-boosted classifier (XGBoost if installed, else sklearn equivalent), gate threshold 0.3. Retrain: `python train_model.py`.
-- Stage 2 `hybrid/pc.py`: 2D conjunction-plane Pc, scipy `dblquad`, HBR 10 m, ASSUMED covariance (TLEs have none).
-- Stage 3 `hybrid/cam.py`: SciPy SLSQP minimum-|dV| burn so Pc <= target (Clohessy-Wiltshire burn model).
-**Honest limits:** ML is trained on physics-labelled synthetic encounters, not real CDMs; covariance is assumed; CAM model is short-horizon near-circular. Original JS screening, globe and tests are unchanged.
