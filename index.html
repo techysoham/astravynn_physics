@@ -57,7 +57,7 @@ code,.tle{font:12px var(--num);color:#a9c7e8}.tle{white-space:pre-wrap;word-brea
 <div id="load"><div><b style="font-size:22px;letter-spacing:.14em">ASTRAVYNN</b><div class="mu" style="margin-top:6px" id="lt">Loading libraries…</div><div class="bar"><i id="lb"></i></div></div></div>
 
 <header id="top"><div id="brand"><b>ASTRAVYNN</b><small>AERIS Mission Console · Space Situational Awareness</small></div>
-<nav id="nav"><button data-v="globe" class="on">Live Globe</button><button data-v="det">Satellite Details</button><button data-v="conj">Conjunction Assessment</button><button data-v="risk">Risk Analysis</button><button data-v="scn">Maneuver Scenario</button><button data-v="man">Maneuver Tracker</button><button data-v="sys">Method</button></nav>
+<nav id="nav"><button data-v="globe" class="on">Live Globe</button><button data-v="det">Satellite Details</button><button data-v="conj">Conjunction Assessment</button><button data-v="risk">Risk Analysis</button><button data-v="scn">Maneuver Scenario</button><button data-v="man">Maneuver Tracker</button><button data-v="hyb">Hybrid ML-Physics</button><button data-v="sys">Method</button></nav>
 <span class="badge" id="src">Starting…</span></header>
 
 <div class="panel" id="legend"><div class="hd" id="lgh" style="cursor:pointer"><b>Layers</b><span class="mu" id="lgt">hide</span></div>
@@ -281,7 +281,7 @@ const sgp=(rec,t)=>{try{const pv=satellite.propagate(rec,new Date(t));return pv&
 const A3=p=>[p.x,p.y,p.z];
 function setStatus(note){const el=$('src');el.className='badge '+SRC.mode;el.textContent=SRC.label;el.title=SRC.detail;$('status').textContent=note+' · '+SRC.label}
 function go(v){curView=v;document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$('view').hidden=v==='globe';if(v!=='globe'){animCards=true;render();const c=$('vc');c.classList.remove('fx');void c.offsetWidth;c.classList.add('fx')}}
-function render(){const f={det:details,conj:conjs,risk:risk,scn:scen,man:mans,sys:method}[curView];$('vc').innerHTML=f&&(S.length)?f():'<p class="mu">Catalog not loaded yet.</p>';afterRender()}
+function render(){const f={det:details,conj:conjs,risk:risk,scn:scen,man:mans,hyb:hybrid,sys:method}[curView];$('vc').innerHTML=f&&(S.length)?f():'<p class="mu">Catalog not loaded yet.</p>';afterRender()}
 $('nav').onclick=e=>{if(e.target.dataset.v)go(e.target.dataset.v)};
 const ASSUMP=()=>`<ul class="sm mu" style="margin:6px 0 0;padding-left:18px">
 <li>Orbits come from a CelesTrak TLE snapshot and are propagated with SGP4 (satellite.js) in the TEME frame. TLE-based positions have kilometre-level uncertainty that grows with TLE age.</li>
@@ -593,6 +593,34 @@ const vwBox=(two)=>`<div class="box"><div class="hd"><b>${two?'Animated encounte
  <div style="display:flex;gap:10px;align-items:center;margin-top:8px;flex-wrap:wrap"><button id="vwP">⏸ Pause</button><input type="range" id="vwS" min="0" max="240" value="0" style="flex:1;min-width:160px"><select id="vwSp" style="width:auto"><option value="0.25">0.25×</option><option value="1" selected>1×</option><option value="3">3×</option></select><button id="vwR">Reset view</button></div>
  <div class="sm" id="vwRead" style="margin-top:6px"></div></div>`;
 const rdrBox=()=>`<div class="box" style="padding:8px"><canvas id="rdr" style="width:100%;height:300px;border-radius:8px;position:static"></canvas></div>`;
+
+/* ---- Hybrid ML-Physics (synopsis pipeline): ML gate -> 2D Pc -> SLSQP CAM, computed by server.py /api/hybrid ---- */
+let HY={res:null,err:null,busy:false,stat:null,target:1e-5,lead:90};
+const sci=x=>x===0?'0':Number(x).toExponential(2);
+function hybrid(){
+  const e=R&&R.events&&R.events[evSel];
+  if(!HY.stat&&!HY.statLoading){HY.statLoading=1;fetch('/api/hybrid/status').then(r=>r.json()).then(j=>{HY.stat=j;if(curView==='hyb')render()}).catch(()=>{HY.stat={error:'server offline'}})}
+  let h='<h2>Hybrid ML-Physics pipeline</h2><p class="mu sm">Stage 1 ML pre-screen (gradient-boosted trees) &rarr; Stage 2 physics 2D conjunction-plane Pc &rarr; Stage 3 SLSQP minimum-&Delta;V manoeuvre. Runs in Python (<code>hybrid/</code>), fed by the events from Conjunction Assessment.</p>';
+  if(!e)return h+'<div class="note">Run a screening first (Conjunction Assessment) and select an event. <button class="pri" data-act="goto" data-v="conj">Open</button></div>'+hyStat();
+  h+=`<div class="note"><b>${esc(R.pName)} &times; ${esc(S[e.j].n)}</b> &middot; miss ${e.miss.toFixed(3)} km &middot; rel. speed ${e.rv.toFixed(2)} km/s</div>
+  <div style="margin:10px 0;display:flex;gap:10px;flex-wrap:wrap;align-items:center"><label class="sm">Target Pc <select id="hyT">${[1e-4,1e-5,1e-6].map(v=>`<option value="${v}" ${v===HY.target?'selected':''}>${sci(v)}</option>`).join('')}</select></label>
+  <label class="sm">Burn lead time (min) <input id="hyL" type="number" value="${HY.lead}" min="10" max="600" style="width:70px"></label>
+  <button class="pri" data-act="hyRun">${HY.busy?'Running...':'Run hybrid assessment'}</button></div>`;
+  if(HY.err)h+=`<div class="note" style="border-color:#c55">${esc(HY.err)}</div>`;
+  const r=HY.res;
+  if(r){const m=r.stage1_ml,p=r.stage2_pc,c=r.stage3_cam;
+    h+=`<div class="note"><b>Decision: ${esc(r.decision)}</b></div><table class="t"><tr><th>Stage</th><th>Result</th></tr>
+    <tr><td>1. ML pre-screen</td><td>P(high risk) = ${m.p_high_risk.toFixed(3)} (gate &gt; ${m.threshold}) &rarr; ${m.high_risk?'forwarded to physics':'benign / logged'}</td></tr>
+    <tr><td>2. Physics Pc (2D plane, dblquad)</td><td>Pc = <b>${sci(p.pc)}</b> &middot; HBR ${p.hbr_km*1000} m &middot; plane miss ${p.miss_km.toFixed(3)} km (alert at ${sci(r.alert_pc)})</td></tr>
+    <tr><td>ML vs physics</td><td>${r.ml_agrees_with_physics?'agree':'DISAGREE: physics result is authoritative'}</td></tr>
+    ${c?`<tr><td>3. SLSQP manoeuvre</td><td>${c.feasible===false?esc(c.note):`${c.needed?'':'not needed. '}&Delta;V = <b>${c.dv_ms.toFixed(3)} m/s</b> (R ${c.dv_rtn_ms[0].toFixed(3)}, T ${c.dv_rtn_ms[1].toFixed(3)}, N ${c.dv_rtn_ms[2].toFixed(3)}) &middot; Pc ${sci(c.pc_before)} &rarr; ${sci(c.pc_after)} &middot; miss ${c.miss_before_km.toFixed(3)} &rarr; ${c.miss_after_km.toFixed(3)} km`}</td></tr>`:''}</table>
+    <p class="mu sm">${esc(p.covariance_note)}. Manoeuvre model: ${c?esc(c.model):'n/a'}. Recommendation is for study, not operations.</p>`}
+  return h+hyStat()}
+function hyStat(){const s=HY.stat;if(!s)return'';if(s.error)return`<div class="note" style="margin-top:12px">ML status unavailable: ${esc(s.error)}. Start with <code>python server.py</code> and install <code>pip install -r requirements.txt</code>.</div>`;
+  return`<h3 style="margin-top:16px">ML model comparison (measured, ${s.n_samples} synthetic encounters, 80/20 stratified)</h3><table class="t"><tr><th>Algorithm</th><th>Accuracy</th><th>Recall (high risk)</th><th>F1</th><th>ROC-AUC</th></tr>${s.table.map(t=>`<tr><td>${esc(t.algorithm)}</td><td>${t.accuracy}</td><td>${t.recall_high_risk}</td><td>${t.f1}</td><td>${t.roc_auc}</td></tr>`).join('')}</table><p class="mu sm">${esc(s.note)}</p>`}
+async function hyRun(){const e=R&&R.events[evSel];if(!e)return;HY.busy=true;HY.err=null;HY.target=+$('hyT').value;HY.lead=+$('hyL').value;render();
+  try{const r=await fetch('/api/hybrid/assess',{method:'POST',body:JSON.stringify({event:{rp:e.rp,vp:e.vp,rs:e.rs,vs:e.vs,agep:Math.max(e.agep,0),ages:Math.max(e.ages,0)},target:HY.target,lead_s:HY.lead*60})});const j=await r.json();if(j.error)HY.err=j.error;else HY.res=j}catch(x){HY.err='Server not reachable. Run python server.py'}
+  HY.busy=false;render()}
 function afterRender(){
   VIZ.radar=null;VIZ.vw=null;
   if(curView==='conj'){const c=$('rdr');if(c&&run.radar){VIZ.radar={cv:c};attachDrag(c)}
@@ -635,6 +663,7 @@ $('vc').onclick=e=>{const t=e.target.closest('[data-act],[data-i],[data-id],[dat
   if(a==='show')return showOnGlobe();
   if(a==='scn'){scnSrc='real';scRes=null;go('scn');return}
   if(a==='exp')return exportEv();
+  if(a==='hyRun')return hyRun();
   if(a==='demo')return makeDemo();
   if(a==='goto')return go(t.dataset.v);
   if(i!==undefined&&!isNaN(i)){go('globe');select(i)}};

@@ -20,7 +20,7 @@
       "recall_high_risk": 0.8,
       "f1": 0.792,
       "roc_auc": 0.996,
-      "fit_s": 0.6
+      "fit_s": 0.81
     },
     {
       "algorithm": "Logistic Regression",
@@ -28,7 +28,7 @@
       "recall_high_risk": 1.0,
       "f1": 0.417,
       "roc_auc": 0.99,
-      "fit_s": 0.02
+      "fit_s": 0.03
     },
     {
       "algorithm": "Random Forest",
@@ -36,7 +36,7 @@
       "recall_high_risk": 0.78,
       "f1": 0.736,
       "roc_auc": 0.995,
-      "fit_s": 1.56
+      "fit_s": 1.46
     }
   ],
   "note": "Labels come from the physics Pc on SYNTHETIC encounters with ASSUMED covariance; not validated on real CDMs."

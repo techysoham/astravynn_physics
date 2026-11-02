@@ -208,6 +208,13 @@ class H(SimpleHTTPRequestHandler):
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
+        elif self.path.startswith("/api/hybrid/status"):
+            try:
+                from hybrid import ml
+                if not os.path.exists(ml.METRICS): ml.train()
+                self._json(json.load(open(ml.METRICS)))
+            except Exception as e:
+                self._json({"error": str(e)}, 501)
         elif self.path.startswith("/api/catalog"):
             body = get_catalog().encode()
             self.send_response(200)
@@ -218,6 +225,24 @@ class H(SimpleHTTPRequestHandler):
         else:
             super().do_GET()
 
+    def _json(self, obj, code=200):
+        body = json.dumps(obj, default=float).encode()
+        self.send_response(code); self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body))); self.end_headers(); self.wfile.write(body)
+
+    def do_POST(self):
+        if self.path.startswith("/api/hybrid/assess"):
+            try:
+                from hybrid import pipeline
+                ln = int(self.headers.get("Content-Length", 0)); q = json.loads(self.rfile.read(ln))
+                self._json(pipeline.run(q["event"], target=float(q.get("target", 1e-5)), lead_s=float(q.get("lead_s", 5400))))
+            except ImportError as e:
+                self._json({"error": "Hybrid layer needs numpy, scipy, scikit-learn (pip install -r requirements.txt): %s" % e}, 501)
+            except Exception as e:
+                self._json({"error": str(e)}, 400)
+        else:
+            self._json({"error": "not found"}, 404)
+
     def log_message(self, fmt, *a):
         if "/api/" in (a[0] if a else ""):
             super().log_message(fmt, *a)
@@ -225,15 +250,19 @@ class H(SimpleHTTPRequestHandler):
 
 if __name__ == "__main__":
     os.chdir(os.path.dirname(os.path.abspath(__file__)))
-
-    port = int(os.environ.get("PORT", 8000))
-    srv = ThreadingHTTPServer(("0.0.0.0", port), H)
-
-    print(f"ASTRAVYNN serving on port {port}")
-
+    srv = None
+    for port in range(8000, 8010):
+        try:
+            srv = ThreadingHTTPServer(("127.0.0.1", port), H); break
+        except OSError:
+            print("port", port, "busy, trying next")
+    if srv is None:
+        sys.exit("No free port in 8000-8009")
+    url = "http://localhost:%d" % port
+    print("ASTRAVYNN serving on", url, "(OFFLINE: cache only)" if OFFLINE else "")
+    if "--no-browser" not in sys.argv:
+        threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
-    finally:
-        srv.server_close()

@@ -5,6 +5,7 @@ import numpy as np
 from .pc import rtn_basis, rel_covariance, plane_geometry, pc_2d
 HERE = os.path.dirname(os.path.abspath(__file__)); MODEL = os.path.join(HERE, "model.joblib"); METRICS = os.path.join(HERE, "model_metrics.json")
 PC_LIMIT = 1e-4
+_CACHE = None
 THR = 0.3  # operating threshold, low to favour recall on the rare high-risk class
 FEATS = ["miss", "rv", "mR", "mT", "mN", "agep", "ages", "alt", "cosang"]
 
@@ -64,13 +65,18 @@ def train(n=8000, seed=0):
         table.append({"algorithm": name, "accuracy": round(accuracy_score(yte, yh), 3), "recall_high_risk": round(recall_score(yte, yh), 3),
                       "f1": round(f1_score(yte, yh), 3), "roc_auc": round(roc_auc_score(yte, p), 3), "fit_s": round(time.time() - t, 2)})
         if i == 0: main = m
-    joblib.dump(main, MODEL)
+    global _CACHE; _CACHE = main
+    try: joblib.dump(main, MODEL)
+    except Exception: pass
     out = {"n_samples": n, "positive_rate": float(y.mean()), "pc_limit": PC_LIMIT, "features": FEATS, "table": table,
            "note": "Labels come from the physics Pc on SYNTHETIC encounters with ASSUMED covariance; not validated on real CDMs."}
     json.dump(out, open(METRICS, "w"), indent=2); return out
 
 def predict(ev, thr=THR):
     import joblib
-    if not os.path.exists(MODEL): train()
-    m = joblib.load(MODEL); p = float(m.predict_proba([features(ev)])[0, 1])
+    global _CACHE
+    if _CACHE is None:
+        try: _CACHE = joblib.load(MODEL)
+        except Exception: train()  # missing or built with another scikit-learn version: retrain here (~5 s)
+    m = _CACHE; p = float(m.predict_proba([features(ev)])[0, 1])
     return {"p_high_risk": p, "threshold": thr, "high_risk": p > thr, "features": dict(zip(FEATS, features(ev)))}
